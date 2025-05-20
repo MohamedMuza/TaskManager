@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Tasks - Task Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2>Your Tasks</h2>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="/tasks/new" class="btn btn-primary">
+            <i class="bi bi-plus"></i> New Task
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Filter Tasks</h5>
+            </div>
+            <div class="card-body">
+                <form action="/tasks" method="get" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="status" class="form-label">Status</label>
+                        <select class="form-select" id="status" name="status">
+                            <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All</option>
+                            <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                            <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="priority" class="form-label">Priority</label>
+                        <select class="form-select" id="priority" name="priority">
+                            <option value="all" {% if priority_filter == 'all' %}selected{% endif %}>All</option>
+                            <option value="high" {% if priority_filter == 'high' %}selected{% endif %}>High</option>
+                            <option value="medium" {% if priority_filter == 'medium' %}selected{% endif %}>Medium</option>
+                            <option value="low" {% if priority_filter == 'low' %}selected{% endif %}>Low</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="sort" class="form-label">Sort By</label>
+                        <select class="form-select" id="sort" name="sort">
+                            <option value="due_date" {% if sort_by == 'due_date' %}selected{% endif %}>Due Date</option>
+                            <option value="priority" {% if sort_by == 'priority' %}selected{% endif %}>Priority</option>
+                            <option value="title" {% if sort_by == 'title' %}selected{% endif %}>Title</option>
+                            <option value="created_at" {% if sort_by == 'created_at' %}selected{% endif %}>Created Date</option>
+                            <option value="updated_at" {% if sort_by == 'updated_at' %}selected{% endif %}>Updated Date</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="order" class="form-label">Order</label>
+                        <select class="form-select" id="order" name="order">
+                            <option value="asc" {% if sort_order == 'asc' %}selected{% endif %}>Ascending</option>
+                            <option value="desc" {% if sort_order == 'desc' %}selected{% endif %}>Descending</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">Apply Filters</button>
+                        <a href="/tasks" class="btn btn-outline-secondary">Reset</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                {% if tasks %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Priority</th>
+                                    <th>Due Date</th>
+                                    <th>Status</th>
+                                    <th>Categories</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for task in tasks %}
+                                <tr>
+                                    <td>{{ task.title }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if task.priority == 'high' %}danger{% elif task.priority == 'medium' %}warning{% else %}info{% endif %}">
+                                            {{ task.priority }}
+                                        </span>
+                                    </td>
+                                    <td>{{ task.due_date or 'No date' }}</td>
+                                    <td>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input task-toggle" type="checkbox" 
+                                                   data-task-id="{{ task.id }}" 
+                                                   {% if task.completed %}checked{% endif %}>
+                                            <label class="form-check-label">
+                                                {{ 'Completed' if task.completed else 'Pending' }}
+                                            </label>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if task.categories %}
+                                            {% for category in task.categories %}
+                                                <span class="badge" style="background-color: {{ category.color }}">
+                                                    {{ category.name }}
+                                                </span>
+                                            {% endfor %}
+                                        {% else %}
+                                            <span class="text-muted">None</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <a href="/tasks/{{ task.id }}" class="btn btn-sm btn-outline-primary">View</a>
+                                            <a href="/tasks/{{ task.id }}/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
+                                            <button type="button" class="btn btn-sm btn-outline-danger delete-task" 
+                                                    data-task-id="{{ task.id }}" 
+                                                    data-task-title="{{ task.title }}">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <p class="lead text-muted">No tasks found matching your filters.</p>
+                        <a href="/tasks/new" class="btn btn-primary mt-3">Create New Task</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Task Modal -->
+<div class="modal fade" id="deleteTaskModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the task "<span id="deleteTaskTitle"></span>"?</p>
+                <p class="text-danger">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <form id="deleteTaskForm" method="post" action="">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Handle task completion toggle
+    document.querySelectorAll('.task-toggle').forEach(toggle => {
+        toggle.addEventListener('change', function() {
+            const taskId = this.dataset.taskId;
+            
+            fetch(`/tasks/${taskId}/toggle`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const label = this.nextElementSibling;
+                    label.textContent = data.completed ? 'Completed' : 'Pending';
+                    
+                    // Optional: refresh the page to update other elements
+                    // window.location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to update task status');
+                this.checked = !this.checked; // Revert the checkbox
+            });
+        });
+    });
+
+    // Setup for delete task modal
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteTaskModal'));
+    
+    document.querySelectorAll('.delete-task').forEach(button => {
+        button.addEventListener('click', function() {
+            const taskId = this.dataset.taskId;
+            const taskTitle = this.dataset.taskTitle;
+            
+            document.getElementById('deleteTaskTitle').textContent = taskTitle;
+            document.getElementById('deleteTaskForm').action = `/tasks/${taskId}/delete`;
+            
+            deleteModal.show();
+        });
+    });
+</script>
+{% endblock %}

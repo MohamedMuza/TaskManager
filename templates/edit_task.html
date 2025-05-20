@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Task - Task Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="/tasks">Tasks</a></li>
+                <li class="breadcrumb-item"><a href="/tasks/{{ task.id }}">{{ task.title }}</a></li>
+                <li class="breadcrumb-item active">Edit</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Edit Task</h4>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/tasks/{{ task.id }}/edit">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Title *</label>
+                        <input type="text" class="form-control" id="title" name="title" value="{{ task.title }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3">{{ task.description }}</textarea>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="priority" class="form-label">Priority</label>
+                            <select class="form-select" id="priority" name="priority">
+                                <option value="low" {% if task.priority == 'low' %}selected{% endif %}>Low</option>
+                                <option value="medium" {% if task.priority == 'medium' %}selected{% endif %}>Medium</option>
+                                <option value="high" {% if task.priority == 'high' %}selected{% endif %}>High</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="due_date" class="form-label">Due Date</label>
+                            <input type="date" class="form-control" id="due_date" name="due_date" value="{{ task.due_date|default('', true)|string|slice(0,10) }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="completed" class="form-label">Status</label>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="completed" name="completed" {% if task.completed %}checked{% endif %}>
+                                <label class="form-check-label" for="completed">
+                                    Mark as completed
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if categories %}
+                    <div class="mb-3">
+                        <label class="form-label">Categories</label>
+                        <div class="row">
+                            {% for category in categories %}
+                            <div class="col-md-4 col-sm-6 mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="categories[]" 
+                                           value="{{ category.id }}" id="category{{ category.id }}"
+                                           {% if category.id in selected_categories %}checked{% endif %}>
+                                    <label class="form-check-label" for="category{{ category.id }}">
+                                        <span class="badge" style="background-color: {{ category.color }};">
+                                            {{ category.name }}
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mt-4 d-flex justify-content-between">
+                        <a href="/tasks/{{ task.id }}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
