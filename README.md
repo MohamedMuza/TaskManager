@@ -65,3 +65,27 @@ The application will be available at http://127.0.0.1:5000/
 - Flask - Python web framework
 - SQLite - Database
 - Bootstrap 5 - Frontend framework 
+
+## Project structure
+task_manager/
+│
+├── static/                  # Static files
+│   ├── css/                 # CSS stylesheets
+│   │   └── styles.css       # Main stylesheet
+│   ├── js/                  # JavaScript files
+│   │   └── script.js        # Main JavaScript file
+│   └── images/              # Image assets
+│
+├── templates/               # HTML templates
+│   ├── base.html            # Base template
+│   ├── index.html           # Homepage
+│   ├── login.html           # Login page
+│   ├── register.html        # Registration page
+│   ├── dashboard.html       # Main dashboard
+│   └── profile.html         # User profile page
+│
+├── app.py                   # Main Flask application
+├── helpers.py               # Helper functions
+├── models.py                # Database models
+├── requirements.txt         # Project dependencies
+└── database.db              # SQLite database

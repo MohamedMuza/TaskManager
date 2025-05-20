@@ -251,6 +251,7 @@ def tasks():
 
     try:
         tasks = db.execute(query, params).fetchall()
+        print(tasks)
 
         # Get categories for each task
         for task in tasks:
