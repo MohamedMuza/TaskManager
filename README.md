@@ -67,6 +67,8 @@ The application will be available at http://127.0.0.1:5000/
 - Bootstrap 5 - Frontend framework 
 
 ## Project structure
+
+```
 task_manager/
 │
 ├── static/                  # Static files
@@ -89,3 +91,4 @@ task_manager/
 ├── models.py                # Database models
 ├── requirements.txt         # Project dependencies
 └── database.db              # SQLite database
+```
