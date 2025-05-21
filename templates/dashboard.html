@@ -61,6 +61,7 @@
                                     <th>Priority</th>
                                     <th>Due Date</th>
                                     <th>Status</th>
+                                    <th>Category</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -78,6 +79,13 @@
                                         <span class="badge bg-{% if task.completed %}success{% else %}secondary{% endif %}">
                                             {{ 'Completed' if task.completed else 'Pending' }}
                                         </span>
+                                    </td>
+                                    <td>
+                                        {% if task.category %}
+                                            <span class="badge" style="background-color: {{ task.category_color }};">{{ task.category }}</span>
+                                        {% else %}
+                                            <span class="text-muted">None</span>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         <a href="/tasks/{{ task.id }}" class="btn btn-sm btn-outline-primary">View</a>
@@ -127,9 +135,9 @@
             </div>
             <div class="card-body">
                 <div class="d-flex flex-wrap gap-2">
-                    <span class="badge bg-primary">Work</span>
-                    <span class="badge bg-success">Personal</span>
-                    <span class="badge bg-warning">Urgent</span>
+                    <span class="badge" style="background-color: #e74c3c;">Work</span>
+                    <span class="badge" style="background-color: #2ecc71;">Personal</span>
+                    <span class="badge" style="background-color: #f39c12;">Urgent</span>
                 </div>
             </div>
         </div>

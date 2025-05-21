@@ -19,6 +19,8 @@ CREATE TABLE tasks (
     priority TEXT DEFAULT 'medium',
     due_date DATE,
     completed BOOLEAN DEFAULT 0,
+    category TEXT CHECK(category IN ('Work', 'Personal', 'Urgent') OR category IS NULL),
+    category_color TEXT DEFAULT '#3498db',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE

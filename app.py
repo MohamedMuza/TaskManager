@@ -21,6 +21,15 @@ app.config["TEMPLATES_AUTO_RELOAD"] = True
 # Configure database
 DATABASE = "database.db"
 
+# Helper function to get color for category
+CATEGORY_COLORS = {
+    'Work': '#e74c3c',
+    'Personal': '#2ecc71',
+    'Urgent': '#f39c12',
+}
+
+def get_category_color(category):
+    return CATEGORY_COLORS.get(category, '#3498db') if category else '#3498db'
 
 def get_db():
     try:
@@ -217,7 +226,7 @@ def tasks():
 
     # Base query
     query = """
-        SELECT t.id, t.title, t.description, t.priority, t.due_date, t.completed, t.created_at, t.updated_at
+        SELECT t.id, t.title, t.description, t.priority, t.due_date, t.completed, t.category, t.category_color, t.created_at, t.updated_at
         FROM tasks t
         WHERE t.user_id = ?
     """
@@ -272,8 +281,8 @@ def new_task():
         description = request.form.get("description", "")
         priority = request.form.get("priority", "medium")
         due_date = request.form.get("due_date", None)
-        category_ids = request.form.getlist("categories")
-
+        category = request.form.get("category", None)
+        category_color = get_category_color(category)
         # Validate data
         if not title:
             flash("Title is required", "error")
@@ -283,13 +292,10 @@ def new_task():
         try:
             now = datetime.now()
             db.execute("""
-                INSERT INTO tasks (user_id, title, description, priority, due_date, completed, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (user_id, title, description, priority, due_date, 0, now, now))
+                INSERT INTO tasks (user_id, title, description, priority, due_date, completed, category, category_color, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, title, description, priority, due_date, 0, category, category_color, now, now))
             db.commit()
-
-            # Get the newly created task's ID
-            task_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
 
             flash("Task created successfully!", "success")
             return redirect("/tasks")
@@ -319,7 +325,7 @@ def view_task(task_id):
     try:
         # Get task details
         task = db.execute("""
-            SELECT id, title, description, priority, due_date, completed, created_at, updated_at
+            SELECT id, title, description, priority, due_date, completed, category, category_color, created_at, updated_at
             FROM tasks
             WHERE id = ? AND user_id = ?
         """, (task_id, user_id)).fetchone()
@@ -361,7 +367,8 @@ def edit_task(task_id):
             priority = request.form.get("priority", "medium")
             due_date = request.form.get("due_date", None)
             completed = 1 if request.form.get("completed") else 0
-            category_ids = request.form.getlist("categories")
+            category = request.form.get("category", None)
+            category_color = get_category_color(category)
 
             # Validate data
             if not title:
@@ -372,17 +379,15 @@ def edit_task(task_id):
             now = datetime.now()
             db.execute("""
                 UPDATE tasks
-                SET title = ?, description = ?, priority = ?, due_date = ?, completed = ?, updated_at = ?
+                SET title = ?, description = ?, priority = ?, due_date = ?, completed = ?, category = ?, category_color = ?, updated_at = ?
                 WHERE id = ? AND user_id = ?
-            """, (title, description, priority, due_date, completed, now, task_id, user_id))
+            """, (title, description, priority, due_date, completed, category, category_color, now, task_id, user_id))
 
             db.commit()
             flash("Task updated successfully!", "success")
             return redirect(f"/tasks/{task_id}")
 
         # GET request - show the form with current values
-        # Get task categories
-
         return render_template("edit_task.html", task=task)
     except sqlite3.Error as e:
         flash(f"Database error: {e}", "error")
@@ -409,9 +414,6 @@ def delete_task(task_id):
             flash("Task not found", "error")
             return redirect("/tasks")
 
-        # Delete associations first
-        db.execute("DELETE FROM task_categories WHERE task_id = ?", (task_id,))
-        
         # Delete task
         db.execute("DELETE FROM tasks WHERE id = ? AND user_id = ?", (task_id, user_id))
         db.commit()
@@ -490,6 +492,18 @@ def quick_add_task():
         flash(f"Database error: {e}", "error")
         return redirect("/")
 
+@app.template_filter('format_datetime')
+def format_datetime(value, format='%Y-%m-%d %H:%M'):
+    if value is None:
+        return 'Unknown'
+    
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except:
+            return 'Unknown'
+            
+    return value.strftime(format)
 
 if __name__ == "__main__":
     app.run(debug=True)
