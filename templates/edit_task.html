@@ -45,7 +45,7 @@
                         </div>
                         <div class="col-md-4">
                             <label for="due_date" class="form-label">Due Date</label>
-                            <input type="date" class="form-control" id="due_date" name="due_date" value="{{ task.due_date|default('', true)|string|slice(0,10) }}">
+                            <input type="date" class="form-control" id="due_date" name="due_date" value="{{ task.due_date }}">
                         </div>
                         <div class="col-md-4">
                             <label for="completed" class="form-label">Status</label>
@@ -58,27 +58,35 @@
                         </div>
                     </div>
                     
-                    {% if categories %}
                     <div class="mb-3">
                         <label class="form-label">Categories</label>
                         <div class="row">
-                            {% for category in categories %}
                             <div class="col-md-4 col-sm-6 mb-2">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="categories[]" 
-                                           value="{{ category.id }}" id="category{{ category.id }}"
-                                           {% if category.id in selected_categories %}checked{% endif %}>
-                                    <label class="form-check-label" for="category{{ category.id }}">
-                                        <span class="badge" style="background-color: {{ category.color }};">
-                                            {{ category.name }}
-                                        </span>
+                                    <input class="form-check-input" type="checkbox" name="categories[]" value="Work" id="categoryWork" {% if 'Work' in selected_categories %}checked{% endif %}>
+                                    <label class="form-check-label" for="categoryWork">
+                                        <span class="badge bg-primary">Work</span>
                                     </label>
                                 </div>
                             </div>
-                            {% endfor %}
+                            <div class="col-md-4 col-sm-6 mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="categories[]" value="Personal" id="categoryPersonal" {% if 'Personal' in selected_categories %}checked{% endif %}>
+                                    <label class="form-check-label" for="categoryPersonal">
+                                        <span class="badge bg-success">Personal</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-4 col-sm-6 mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="categories[]" value="Urgent" id="categoryUrgent" {% if 'Urgent' in selected_categories %}checked{% endif %}>
+                                    <label class="form-check-label" for="categoryUrgent">
+                                        <span class="badge bg-warning">Urgent</span>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    {% endif %}
                     
                     <div class="mt-4 d-flex justify-content-between">
                         <a href="/tasks/{{ task.id }}" class="btn btn-outline-secondary">Cancel</a>

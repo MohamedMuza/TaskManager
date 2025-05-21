@@ -103,18 +103,13 @@ def index():
             LIMIT 5
         """, (user_id,)).fetchall()
 
-        # Get categories
-        categories = db.execute("SELECT id, name, color FROM categories WHERE user_id = ?",
-                              (user_id,)).fetchall()
-
         return render_template("dashboard.html",
                              username=user["username"],
                              total_tasks=total_tasks,
                              completed_tasks=completed_tasks,
                              pending_tasks=pending_tasks,
                              high_priority_tasks=high_priority_tasks,
-                             recent_tasks=recent_tasks,
-                             categories=categories)
+                             recent_tasks=recent_tasks)
     except sqlite3.Error as e:
         flash(f"Database error: {e}", "error")
         return redirect("/login")
@@ -252,21 +247,7 @@ def tasks():
     try:
         tasks = db.execute(query, params).fetchall()
 
-        # Get categories for each task
-        for task in tasks:
-            task_categories = db.execute("""
-                SELECT c.id, c.name, c.color
-                FROM categories c
-                JOIN task_categories tc ON c.id = tc.category_id
-                WHERE tc.task_id = ?
-            """, (task["id"],)).fetchall()
-            task["categories"] = task_categories
-
-        # Get all categories for the filter dropdown
-        categories = db.execute("SELECT id, name, color FROM categories WHERE user_id = ?",
-                                (user_id,)).fetchall()
-
-        return render_template("tasks.html", tasks=tasks, categories=categories,
+        return render_template("tasks.html", tasks=tasks,
                                status_filter=status_filter, priority_filter=priority_filter,
                                sort_by=sort_by, sort_order=sort_order)
     except sqlite3.Error as e:
@@ -310,13 +291,6 @@ def new_task():
             # Get the newly created task's ID
             task_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
 
-            # Associate task with categories
-            if category_ids:
-                for category_id in category_ids:
-                    db.execute("INSERT INTO task_categories (task_id, category_id) VALUES (?, ?)",
-                            (task_id, category_id))
-                db.commit()
-
             flash("Task created successfully!", "success")
             return redirect("/tasks")
         except sqlite3.Error as e:
@@ -325,9 +299,7 @@ def new_task():
 
     # GET request - show the form
     try:
-        categories = db.execute("SELECT id, name, color FROM categories WHERE user_id = ?",
-                                (user_id,)).fetchall()
-        return render_template("new_task.html", categories=categories)
+        return render_template("new_task.html")
     except sqlite3.Error as e:
         flash(f"Database error: {e}", "error")
         return redirect("/tasks")
@@ -356,19 +328,7 @@ def view_task(task_id):
             flash("Task not found", "error")
             return redirect("/tasks")
 
-        # Get task categories
-        task_categories = db.execute("""
-            SELECT c.id, c.name, c.color
-            FROM categories c
-            JOIN task_categories tc ON c.id = tc.category_id
-            WHERE tc.task_id = ?
-        """, (task_id,)).fetchall()
-
-        # Get all categories for editing
-        all_categories = db.execute("SELECT id, name, color FROM categories WHERE user_id = ?",
-                                    (user_id,)).fetchall()
-
-        return render_template("view_task.html", task=task, task_categories=task_categories, all_categories=all_categories)
+        return render_template("view_task.html", task=task)
     except sqlite3.Error as e:
         flash(f"Database error: {e}", "error")
         return redirect("/tasks")
@@ -416,33 +376,14 @@ def edit_task(task_id):
                 WHERE id = ? AND user_id = ?
             """, (title, description, priority, due_date, completed, now, task_id, user_id))
 
-            # Update categories: First delete existing associations
-            db.execute("DELETE FROM task_categories WHERE task_id = ?", (task_id,))
-
-            # Then add new associations
-            if category_ids:
-                for category_id in category_ids:
-                    db.execute("INSERT INTO task_categories (task_id, category_id) VALUES (?, ?)",
-                            (task_id, category_id))
-
             db.commit()
             flash("Task updated successfully!", "success")
             return redirect(f"/tasks/{task_id}")
 
         # GET request - show the form with current values
         # Get task categories
-        task_categories = db.execute("""
-            SELECT category_id
-            FROM task_categories
-            WHERE task_id = ?
-        """, (task_id,)).fetchall()
-        selected_categories = [tc["category_id"] for tc in task_categories]
 
-        # Get all categories
-        categories = db.execute("SELECT id, name, color FROM categories WHERE user_id = ?",
-                                (user_id,)).fetchall()
-
-        return render_template("edit_task.html", task=task, categories=categories, selected_categories=selected_categories)
+        return render_template("edit_task.html", task=task)
     except sqlite3.Error as e:
         flash(f"Database error: {e}", "error")
         return redirect("/tasks")
