@@ -5,7 +5,6 @@ A simple Flask web application to help you manage and organize your tasks.
 ## Features
 
 - User registration and login
-- Dashboard with task statistics
 - Create, view, edit, and delete tasks
 - Filter and sort tasks by different criteria
 - Assign categories to tasks
