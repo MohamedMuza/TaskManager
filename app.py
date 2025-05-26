@@ -18,8 +18,13 @@ Session(app)
 # Ensure templates are auto-reloaded
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
+# Database
+app.config['DATABASE'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "database.db")
+
+SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema.sql")
+
 # Configure database
-DATABASE = "database.db"
+DATABASE = app.config['DATABASE']
 
 # Helper function to get color for category
 CATEGORY_COLORS = {
@@ -28,8 +33,10 @@ CATEGORY_COLORS = {
     'Urgent': '#f39c12',
 }
 
+
 def get_category_color(category):
     return CATEGORY_COLORS.get(category, '#3498db') if category else '#3498db'
+
 
 def get_db():
     try:
@@ -47,7 +54,7 @@ def init_db():
             db = get_db()
             if db is None:
                 return False
-            with open('schema.sql', 'r') as f:
+            with open(SCHEMA_PATH, 'r') as f:
                 db.executescript(f.read())
             db.commit()
             return True
@@ -79,9 +86,9 @@ def index():
     if db is None:
         flash("Database connection error", "error")
         return redirect("/login")
-        
+
     user_id = session["user_id"]
-    
+
     # Get user information
     user = db.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()
     if not user:
@@ -92,16 +99,17 @@ def index():
     # Get task counts
     try:
         total_tasks = db.execute("SELECT COUNT(*) as count FROM tasks WHERE user_id = ?",
-                               (user_id,)).fetchone()["count"]
-
-        completed_tasks = db.execute("SELECT COUNT(*) as count FROM tasks WHERE user_id = ? AND completed = 1",
-                                   (user_id,)).fetchone()["count"]
-
-        pending_tasks = db.execute("SELECT COUNT(*) as count FROM tasks WHERE user_id = ? AND completed = 0",
                                  (user_id,)).fetchone()["count"]
 
-        high_priority_tasks = db.execute("SELECT COUNT(*) as count FROM tasks WHERE user_id = ? AND priority = 'high' AND completed = 0",
-                                       (user_id,)).fetchone()["count"]
+        completed_tasks = db.execute("SELECT COUNT(*) as count FROM tasks WHERE user_id = ? AND completed = 1",
+                                     (user_id,)).fetchone()["count"]
+
+        pending_tasks = db.execute("SELECT COUNT(*) as count FROM tasks WHERE user_id = ? AND completed = 0",
+                                   (user_id,)).fetchone()["count"]
+
+        high_priority_tasks = \
+        db.execute("SELECT COUNT(*) as count FROM tasks WHERE user_id = ? AND priority = 'high' AND completed = 0",
+                   (user_id,)).fetchone()["count"]
 
         # Get recent tasks
         recent_tasks = db.execute("""
@@ -113,12 +121,12 @@ def index():
         """, (user_id,)).fetchall()
 
         return render_template("dashboard.html",
-                             username=user["username"],
-                             total_tasks=total_tasks,
-                             completed_tasks=completed_tasks,
-                             pending_tasks=pending_tasks,
-                             high_priority_tasks=high_priority_tasks,
-                             recent_tasks=recent_tasks)
+                               username=user["username"],
+                               total_tasks=total_tasks,
+                               completed_tasks=completed_tasks,
+                               pending_tasks=pending_tasks,
+                               high_priority_tasks=high_priority_tasks,
+                               recent_tasks=recent_tasks)
     except sqlite3.Error as e:
         flash(f"Database error: {e}", "error")
         return redirect("/login")
@@ -213,7 +221,7 @@ def tasks():
     """Show all tasks"""
     user_id = session["user_id"]
     db = get_db()
-    
+
     if db is None:
         flash("Database connection error", "error")
         return redirect("/")
@@ -270,7 +278,7 @@ def new_task():
     """Create a new task"""
     user_id = session["user_id"]
     db = get_db()
-    
+
     if db is None:
         flash("Database connection error", "error")
         return redirect("/tasks")
@@ -317,7 +325,7 @@ def view_task(task_id):
     """View a single task"""
     user_id = session["user_id"]
     db = get_db()
-    
+
     if db is None:
         flash("Database connection error", "error")
         return redirect("/tasks")
@@ -346,7 +354,7 @@ def edit_task(task_id):
     """Edit a task"""
     user_id = session["user_id"]
     db = get_db()
-    
+
     if db is None:
         flash("Database connection error", "error")
         return redirect("/tasks")
@@ -354,7 +362,7 @@ def edit_task(task_id):
     try:
         # Check if task exists and belongs to user
         task = db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-                        (task_id, user_id)).fetchone()
+                          (task_id, user_id)).fetchone()
 
         if not task:
             flash("Task not found", "error")
@@ -400,7 +408,7 @@ def delete_task(task_id):
     """Delete a task"""
     user_id = session["user_id"]
     db = get_db()
-    
+
     if db is None:
         flash("Database connection error", "error")
         return redirect("/tasks")
@@ -408,7 +416,7 @@ def delete_task(task_id):
     try:
         # Check if task exists and belongs to user
         task = db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-                        (task_id, user_id)).fetchone()
+                          (task_id, user_id)).fetchone()
 
         if not task:
             flash("Task not found", "error")
@@ -431,14 +439,14 @@ def toggle_task(task_id):
     """Toggle task completion status"""
     user_id = session["user_id"]
     db = get_db()
-    
+
     if db is None:
         return jsonify({"success": False, "message": "Database connection error"}), 500
 
     try:
         # Check if task exists and belongs to user
         task = db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-                        (task_id, user_id)).fetchone()
+                          (task_id, user_id)).fetchone()
 
         if not task:
             return jsonify({"success": False, "message": "Task not found"}), 404
@@ -464,7 +472,7 @@ def quick_add_task():
     """Quickly add a task with minimal information"""
     user_id = session["user_id"]
     db = get_db()
-    
+
     if db is None:
         flash("Database connection error", "error")
         return redirect("/")
@@ -492,18 +500,16 @@ def quick_add_task():
         flash(f"Database error: {e}", "error")
         return redirect("/")
 
+
 @app.template_filter('format_datetime')
 def format_datetime(value, format='%Y-%m-%d %H:%M'):
     if value is None:
         return 'Unknown'
-    
+
     if isinstance(value, str):
         try:
             value = datetime.fromisoformat(value)
         except:
             return 'Unknown'
-            
-    return value.strftime(format)
 
-if __name__ == "__main__":
-    app.run(debug=True)
+    return value.strftime(format)
