@@ -18,8 +18,24 @@ Session(app)
 # Ensure templates are auto-reloaded
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
+# Database
+app.config['DATABASE'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "database.db")
+
+SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema.sql")
+
 # Configure database
-DATABASE = "database.db"
+DATABASE = app.config['DATABASE']
+
+# Helper function to get color for category
+CATEGORY_COLORS = {
+    'Work': '#e74c3c',
+    'Personal': '#2ecc71',
+    'Urgent': '#f39c12',
+}
+
+
+def get_category_color(category):
+    return CATEGORY_COLORS.get(category, '#3498db') if category else '#3498db'
 
 
 def get_db():
@@ -38,7 +54,7 @@ def init_db():
             db = get_db()
             if db is None:
                 return False
-            with open('schema.sql', 'r') as f:
+            with open(SCHEMA_PATH, 'r') as f:
                 db.executescript(f.read())
             db.commit()
             return True
@@ -70,9 +86,9 @@ def index():
     if db is None:
         flash("Database connection error", "error")
         return redirect("/login")
-        
+
     user_id = session["user_id"]
-    
+
     # Get user information
     user = db.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()
     if not user:
@@ -83,16 +99,17 @@ def index():
     # Get task counts
     try:
         total_tasks = db.execute("SELECT COUNT(*) as count FROM tasks WHERE user_id = ?",
-                               (user_id,)).fetchone()["count"]
-
-        completed_tasks = db.execute("SELECT COUNT(*) as count FROM tasks WHERE user_id = ? AND completed = 1",
-                                   (user_id,)).fetchone()["count"]
-
-        pending_tasks = db.execute("SELECT COUNT(*) as count FROM tasks WHERE user_id = ? AND completed = 0",
                                  (user_id,)).fetchone()["count"]
 
-        high_priority_tasks = db.execute("SELECT COUNT(*) as count FROM tasks WHERE user_id = ? AND priority = 'high' AND completed = 0",
-                                       (user_id,)).fetchone()["count"]
+        completed_tasks = db.execute("SELECT COUNT(*) as count FROM tasks WHERE user_id = ? AND completed = 1",
+                                     (user_id,)).fetchone()["count"]
+
+        pending_tasks = db.execute("SELECT COUNT(*) as count FROM tasks WHERE user_id = ? AND completed = 0",
+                                   (user_id,)).fetchone()["count"]
+
+        high_priority_tasks = \
+        db.execute("SELECT COUNT(*) as count FROM tasks WHERE user_id = ? AND priority = 'high' AND completed = 0",
+                   (user_id,)).fetchone()["count"]
 
         # Get recent tasks
         recent_tasks = db.execute("""
@@ -103,18 +120,13 @@ def index():
             LIMIT 5
         """, (user_id,)).fetchall()
 
-        # Get categories
-        categories = db.execute("SELECT id, name, color FROM categories WHERE user_id = ?",
-                              (user_id,)).fetchall()
-
         return render_template("dashboard.html",
-                             username=user["username"],
-                             total_tasks=total_tasks,
-                             completed_tasks=completed_tasks,
-                             pending_tasks=pending_tasks,
-                             high_priority_tasks=high_priority_tasks,
-                             recent_tasks=recent_tasks,
-                             categories=categories)
+                               username=user["username"],
+                               total_tasks=total_tasks,
+                               completed_tasks=completed_tasks,
+                               pending_tasks=pending_tasks,
+                               high_priority_tasks=high_priority_tasks,
+                               recent_tasks=recent_tasks)
     except sqlite3.Error as e:
         flash(f"Database error: {e}", "error")
         return redirect("/login")
@@ -209,7 +221,7 @@ def tasks():
     """Show all tasks"""
     user_id = session["user_id"]
     db = get_db()
-    
+
     if db is None:
         flash("Database connection error", "error")
         return redirect("/")
@@ -222,7 +234,7 @@ def tasks():
 
     # Base query
     query = """
-        SELECT t.id, t.title, t.description, t.priority, t.due_date, t.completed, t.created_at, t.updated_at
+        SELECT t.id, t.title, t.description, t.priority, t.due_date, t.completed, t.category, t.category_color, t.created_at, t.updated_at
         FROM tasks t
         WHERE t.user_id = ?
     """
@@ -252,21 +264,7 @@ def tasks():
     try:
         tasks = db.execute(query, params).fetchall()
 
-        # Get categories for each task
-        for task in tasks:
-            task_categories = db.execute("""
-                SELECT c.id, c.name, c.color
-                FROM categories c
-                JOIN task_categories tc ON c.id = tc.category_id
-                WHERE tc.task_id = ?
-            """, (task["id"],)).fetchall()
-            task["categories"] = task_categories
-
-        # Get all categories for the filter dropdown
-        categories = db.execute("SELECT id, name, color FROM categories WHERE user_id = ?",
-                                (user_id,)).fetchall()
-
-        return render_template("tasks.html", tasks=tasks, categories=categories,
+        return render_template("tasks.html", tasks=tasks,
                                status_filter=status_filter, priority_filter=priority_filter,
                                sort_by=sort_by, sort_order=sort_order)
     except sqlite3.Error as e:
@@ -280,7 +278,7 @@ def new_task():
     """Create a new task"""
     user_id = session["user_id"]
     db = get_db()
-    
+
     if db is None:
         flash("Database connection error", "error")
         return redirect("/tasks")
@@ -291,8 +289,8 @@ def new_task():
         description = request.form.get("description", "")
         priority = request.form.get("priority", "medium")
         due_date = request.form.get("due_date", None)
-        category_ids = request.form.getlist("categories")
-
+        category = request.form.get("category", None)
+        category_color = get_category_color(category)
         # Validate data
         if not title:
             flash("Title is required", "error")
@@ -302,20 +300,10 @@ def new_task():
         try:
             now = datetime.now()
             db.execute("""
-                INSERT INTO tasks (user_id, title, description, priority, due_date, completed, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (user_id, title, description, priority, due_date, 0, now, now))
+                INSERT INTO tasks (user_id, title, description, priority, due_date, completed, category, category_color, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, title, description, priority, due_date, 0, category, category_color, now, now))
             db.commit()
-
-            # Get the newly created task's ID
-            task_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
-
-            # Associate task with categories
-            if category_ids:
-                for category_id in category_ids:
-                    db.execute("INSERT INTO task_categories (task_id, category_id) VALUES (?, ?)",
-                            (task_id, category_id))
-                db.commit()
 
             flash("Task created successfully!", "success")
             return redirect("/tasks")
@@ -325,9 +313,7 @@ def new_task():
 
     # GET request - show the form
     try:
-        categories = db.execute("SELECT id, name, color FROM categories WHERE user_id = ?",
-                                (user_id,)).fetchall()
-        return render_template("new_task.html", categories=categories)
+        return render_template("new_task.html")
     except sqlite3.Error as e:
         flash(f"Database error: {e}", "error")
         return redirect("/tasks")
@@ -339,7 +325,7 @@ def view_task(task_id):
     """View a single task"""
     user_id = session["user_id"]
     db = get_db()
-    
+
     if db is None:
         flash("Database connection error", "error")
         return redirect("/tasks")
@@ -347,7 +333,7 @@ def view_task(task_id):
     try:
         # Get task details
         task = db.execute("""
-            SELECT id, title, description, priority, due_date, completed, created_at, updated_at
+            SELECT id, title, description, priority, due_date, completed, category, category_color, created_at, updated_at
             FROM tasks
             WHERE id = ? AND user_id = ?
         """, (task_id, user_id)).fetchone()
@@ -356,19 +342,7 @@ def view_task(task_id):
             flash("Task not found", "error")
             return redirect("/tasks")
 
-        # Get task categories
-        task_categories = db.execute("""
-            SELECT c.id, c.name, c.color
-            FROM categories c
-            JOIN task_categories tc ON c.id = tc.category_id
-            WHERE tc.task_id = ?
-        """, (task_id,)).fetchall()
-
-        # Get all categories for editing
-        all_categories = db.execute("SELECT id, name, color FROM categories WHERE user_id = ?",
-                                    (user_id,)).fetchall()
-
-        return render_template("view_task.html", task=task, task_categories=task_categories, all_categories=all_categories)
+        return render_template("view_task.html", task=task)
     except sqlite3.Error as e:
         flash(f"Database error: {e}", "error")
         return redirect("/tasks")
@@ -380,7 +354,7 @@ def edit_task(task_id):
     """Edit a task"""
     user_id = session["user_id"]
     db = get_db()
-    
+
     if db is None:
         flash("Database connection error", "error")
         return redirect("/tasks")
@@ -388,7 +362,7 @@ def edit_task(task_id):
     try:
         # Check if task exists and belongs to user
         task = db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-                        (task_id, user_id)).fetchone()
+                          (task_id, user_id)).fetchone()
 
         if not task:
             flash("Task not found", "error")
@@ -401,7 +375,8 @@ def edit_task(task_id):
             priority = request.form.get("priority", "medium")
             due_date = request.form.get("due_date", None)
             completed = 1 if request.form.get("completed") else 0
-            category_ids = request.form.getlist("categories")
+            category = request.form.get("category", None)
+            category_color = get_category_color(category)
 
             # Validate data
             if not title:
@@ -412,37 +387,16 @@ def edit_task(task_id):
             now = datetime.now()
             db.execute("""
                 UPDATE tasks
-                SET title = ?, description = ?, priority = ?, due_date = ?, completed = ?, updated_at = ?
+                SET title = ?, description = ?, priority = ?, due_date = ?, completed = ?, category = ?, category_color = ?, updated_at = ?
                 WHERE id = ? AND user_id = ?
-            """, (title, description, priority, due_date, completed, now, task_id, user_id))
-
-            # Update categories: First delete existing associations
-            db.execute("DELETE FROM task_categories WHERE task_id = ?", (task_id,))
-
-            # Then add new associations
-            if category_ids:
-                for category_id in category_ids:
-                    db.execute("INSERT INTO task_categories (task_id, category_id) VALUES (?, ?)",
-                            (task_id, category_id))
+            """, (title, description, priority, due_date, completed, category, category_color, now, task_id, user_id))
 
             db.commit()
             flash("Task updated successfully!", "success")
             return redirect(f"/tasks/{task_id}")
 
         # GET request - show the form with current values
-        # Get task categories
-        task_categories = db.execute("""
-            SELECT category_id
-            FROM task_categories
-            WHERE task_id = ?
-        """, (task_id,)).fetchall()
-        selected_categories = [tc["category_id"] for tc in task_categories]
-
-        # Get all categories
-        categories = db.execute("SELECT id, name, color FROM categories WHERE user_id = ?",
-                                (user_id,)).fetchall()
-
-        return render_template("edit_task.html", task=task, categories=categories, selected_categories=selected_categories)
+        return render_template("edit_task.html", task=task)
     except sqlite3.Error as e:
         flash(f"Database error: {e}", "error")
         return redirect("/tasks")
@@ -454,7 +408,7 @@ def delete_task(task_id):
     """Delete a task"""
     user_id = session["user_id"]
     db = get_db()
-    
+
     if db is None:
         flash("Database connection error", "error")
         return redirect("/tasks")
@@ -462,15 +416,12 @@ def delete_task(task_id):
     try:
         # Check if task exists and belongs to user
         task = db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-                        (task_id, user_id)).fetchone()
+                          (task_id, user_id)).fetchone()
 
         if not task:
             flash("Task not found", "error")
             return redirect("/tasks")
 
-        # Delete associations first
-        db.execute("DELETE FROM task_categories WHERE task_id = ?", (task_id,))
-        
         # Delete task
         db.execute("DELETE FROM tasks WHERE id = ? AND user_id = ?", (task_id, user_id))
         db.commit()
@@ -488,14 +439,14 @@ def toggle_task(task_id):
     """Toggle task completion status"""
     user_id = session["user_id"]
     db = get_db()
-    
+
     if db is None:
         return jsonify({"success": False, "message": "Database connection error"}), 500
 
     try:
         # Check if task exists and belongs to user
         task = db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-                        (task_id, user_id)).fetchone()
+                          (task_id, user_id)).fetchone()
 
         if not task:
             return jsonify({"success": False, "message": "Task not found"}), 404
@@ -521,7 +472,7 @@ def quick_add_task():
     """Quickly add a task with minimal information"""
     user_id = session["user_id"]
     db = get_db()
-    
+
     if db is None:
         flash("Database connection error", "error")
         return redirect("/")
@@ -550,5 +501,15 @@ def quick_add_task():
         return redirect("/")
 
 
-if __name__ == "__main__":
-    app.run(debug=True)
+@app.template_filter('format_datetime')
+def format_datetime(value, format='%Y-%m-%d %H:%M'):
+    if value is None:
+        return 'Unknown'
+
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except:
+            return 'Unknown'
+
+    return value.strftime(format)
